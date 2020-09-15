@@ -13,7 +13,7 @@ struct Args {
     entries: PathBuf,
 
     // The output directory.
-    #[structopt(default_value=".")]
+    #[structopt(default_value="./gust_generated")]
     output: PathBuf,
 }
 

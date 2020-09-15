@@ -1,5 +1,5 @@
 use serde::{Deserialize};
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Local, NaiveDate, Utc};
 
 use crate::listing::ListingPost;
 
@@ -23,7 +23,7 @@ pub struct Frontmatter {
 
     pub desc: Option<String>,
     pub author: Option<String>,
-    pub date: DateTime<Local>,
+    pub date: NaiveDate,
 }
 
 impl Frontmatter {
@@ -31,10 +31,9 @@ impl Frontmatter {
         ListingPost {
             slug,
             desc: self.desc,
-            date: self.date.clone().into(),
+            date: self.date.clone(),
             author: self.author,
-            // TODO: impl
-            last_modified: self.date.into(),
+            last_modified: Utc::now(),
         }
     }
 }

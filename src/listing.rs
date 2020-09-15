@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, NaiveDate};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -12,6 +12,6 @@ pub struct ListingPost {
     pub desc: Option<String>,
 
     pub author: Option<String>,
-    pub date: DateTime<Utc>,
+    pub date: NaiveDate,
     pub last_modified: DateTime<Utc>,
 }
