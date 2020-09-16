@@ -14,3 +14,5 @@ paw = "1.0.0"
 structopt = { version = "0.3.17", features = ["paw"] }
 anyhow = "1.0.32"
 serde_yaml = "0.8.13"
+git2 = "0.13.11"
+pathdiff = "0.2.0"
