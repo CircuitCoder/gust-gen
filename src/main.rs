@@ -1,16 +1,32 @@
-mod listing;
 mod frontmatter;
+mod listing;
 
-use listing::Listing;
-use frontmatter::{Frontmatter, EntryStatus};
-use structopt::StructOpt;
-use std::path::{PathBuf, Path};
 use anyhow::Error;
+use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
+use frontmatter::{EntryStatus, Frontmatter};
 use git2::{Repository, Sort};
-use chrono::{Utc, DateTime, NaiveDateTime, FixedOffset};
+use listing::Listing;
+use std::path::{Path, PathBuf};
+use structopt::StructOpt;
 
 fn path_to_slug<P: AsRef<Path>>(p: P) -> String {
     p.as_ref().file_stem().unwrap().to_str().unwrap().to_owned()
+}
+
+fn emit_markdown<P1, P2>(output: P1, from: P2, slug: &str) -> Result<(), Error>
+where
+    P1: AsRef<Path>,
+    P2: AsRef<Path>,
+{
+    let mut base = output.as_ref().join("entries");
+    std::fs::create_dir_all(&base)?;
+
+    base.push(slug);
+    base.set_extension(".md");
+    println!("Copy from {}", from.as_ref().display());
+    std::fs::copy(from, &base)?;
+
+    Ok(())
 }
 
 #[derive(StructOpt)]
@@ -19,11 +35,11 @@ struct Args {
     entries: PathBuf,
 
     // The output directory.
-    #[structopt(default_value="./gust_generated")]
+    #[structopt(default_value = "./gust_generated")]
     output: PathBuf,
 
     // The git ref for resolving timestamp
-    #[structopt(long, short, default_value="HEAD")]
+    #[structopt(long, short, default_value = "HEAD")]
     gitref: String,
 }
 
@@ -34,13 +50,18 @@ fn main(args: Args) -> Result<(), Error> {
     let mut entries = Vec::new();
 
     let repo = Repository::discover(&args.entries)?;
-    let base = repo.workdir().ok_or(anyhow::anyhow!("Cannot read workdir of git repo!"))?;
-    let current_commit = repo.resolve_reference_from_short_name(&args.gitref)?.peel_to_commit()?;
+    let base = repo
+        .workdir()
+        .ok_or(anyhow::anyhow!("Cannot read workdir of git repo!"))?;
+    let current_commit = repo
+        .resolve_reference_from_short_name(&args.gitref)?
+        .peel_to_commit()?;
     let ref_time = current_commit.time();
     let ref_dt: DateTime<Utc> = DateTime::<FixedOffset>::from_utc(
         NaiveDateTime::from_timestamp(ref_time.seconds(), 0),
         FixedOffset::east(ref_time.offset_minutes() * 60),
-    ).into();
+    )
+    .into();
     let current = current_commit.tree()?;
 
     let mut pending = Vec::new();
@@ -60,7 +81,7 @@ fn main(args: Args) -> Result<(), Error> {
             serde_yaml::from_str(inner)?
         } else {
             // Skip because there is no front-matter
-            continue
+            continue;
         };
 
         if fm.status == EntryStatus::Unspecified {
@@ -76,10 +97,8 @@ fn main(args: Args) -> Result<(), Error> {
             let slug = path_to_slug(rel_path);
             println!("Found {} out of tree", slug);
 
-            entries.push(fm.into_post(
-                slug,
-                Utc::now(),
-            ));
+            emit_markdown(&args.output, &entry_path, &slug)?;
+            entries.push(fm.into_post(slug, Utc::now()));
         }
     }
 
@@ -103,7 +122,8 @@ fn main(args: Args) -> Result<(), Error> {
         let dt: DateTime<Utc> = DateTime::<FixedOffset>::from_utc(
             NaiveDateTime::from_timestamp(time.seconds(), 0),
             FixedOffset::east(time.offset_minutes() * 60),
-        ).into();
+        )
+        .into();
 
         for (path, fm, oid, last_mod) in pending.drain(..) {
             let slug = path_to_slug(&path);
@@ -118,10 +138,8 @@ fn main(args: Args) -> Result<(), Error> {
             if changed {
                 println!("Found {} changed from {}", slug, commit.id());
 
-                entries.push(fm.into_post(
-                    slug,
-                    last_mod,
-                ));
+                emit_markdown(&args.output, base.join(&path), &slug)?;
+                entries.push(fm.into_post(slug, last_mod));
             } else {
                 shuffle.push((path, fm, oid, dt));
             }
@@ -132,13 +150,11 @@ fn main(args: Args) -> Result<(), Error> {
 
     // Those files stay unchanged since the beginning
     for (path, fm, _oid, dt) in pending {
-        let slug = path_to_slug(path);
+        let slug = path_to_slug(&path);
         println!("{} was there ever since the beginning", slug);
 
-        entries.push(fm.into_post(
-            slug,
-            dt,
-        ));
+        emit_markdown(&args.output, base.join(&path), &slug)?;
+        entries.push(fm.into_post(slug, dt));
     }
 
     let listing = Listing { entries };
