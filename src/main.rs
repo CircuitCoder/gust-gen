@@ -22,7 +22,7 @@ where
     std::fs::create_dir_all(&base)?;
 
     base.push(slug);
-    base.set_extension(".md");
+    base.set_extension("md");
     println!("Copy from {}", from.as_ref().display());
     std::fs::copy(from, &base)?;
 
