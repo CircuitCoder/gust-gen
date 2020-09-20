@@ -31,8 +31,8 @@ where
 
 #[derive(StructOpt)]
 struct Args {
-    // The directory containing all entries
-    entries: PathBuf,
+    // The directory containing entries and assets
+    root: PathBuf,
 
     // The output directory.
     #[structopt(default_value = "./gust_generated")]
@@ -45,11 +45,11 @@ struct Args {
 
 #[paw::main]
 fn main(args: Args) -> Result<(), Error> {
-    let entry_paths = std::fs::read_dir(&args.entries)?;
+    let entry_paths = std::fs::read_dir(args.root.join("entries"))?;
 
     let mut entries = Vec::new();
 
-    let repo = Repository::discover(&args.entries)?;
+    let repo = Repository::discover(&args.root)?;
     let base = repo
         .workdir()
         .ok_or(anyhow::anyhow!("Cannot read workdir of git repo!"))?;
@@ -166,6 +166,14 @@ fn main(args: Args) -> Result<(), Error> {
 
     let listing_file = std::fs::File::create(listing_path)?;
     serde_json::to_writer(listing_file, &listing)?;
+
+    // Emit assets
+    let options = fs_extra::dir::CopyOptions {
+        overwrite: true,
+        copy_inside: true,
+        ..Default::default()
+    };
+    fs_extra::dir::copy(args.root.join("assets"), args.output.join("assets"), &options)?;
 
     Ok(())
 }
